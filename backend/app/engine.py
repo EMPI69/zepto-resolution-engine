@@ -243,7 +243,7 @@ class ResolutionEngine:
 
         return {
             "order_id": order["order_id"],
-            "items": order["items"],
+            "items": int(order["items"]),
             "value_inr": float(order["value_inr"]),
             "delivery_time_min": float(
                 order["delivery_time_min"]
