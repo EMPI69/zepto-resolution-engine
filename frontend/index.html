@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zepto Resolution Engine — Customer Support AI Ops</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            gray: {
+              950: '#030712',
+              900: '#0B0F17',
+              850: '#111827',
+              800: '#1F2937',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18 & Babel for standalone browser runtime -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      background-color: #030712;
+      color: #f3f4f6;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', sans-serif;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.3s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen selection:bg-purple-500 selection:text-white">
+  
+  <div id="root"></div>
+
+  <!-- Vite module entry script -->
+  <script type="module" src="/src/main.tsx"></script>
+
+  <!-- Standalone Browser Script (runs if React isn't mounted by Vite module loader) -->
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const API_BASE_URL = "https://zepto-resolution-engine.onrender.com";
+
+    const SAMPLE_TICKETS = [
+      { id: "N-015", label: "N-015", tag: "AUTO_RESOLVE" },
+      { id: "N-002", label: "N-002", tag: "HUMAN_REVIEW" },
+      { id: "N-001", label: "N-001", tag: "SAMPLE" },
+      { id: "N-005", label: "N-005", tag: "SAMPLE" },
+    ];
+
+    function formatActionName(action) {
+      if (!action) return 'Not executed — human review required';
+      const map = {
+        'partial_refund': 'Partial Refund',
+        'full_refund': 'Full Refund',
+        'redelivery': 'Redelivery',
+        'apology_no_action': 'Apology / No Action',
+        'escalation': 'Escalation',
+      };
+      if (map[action]) return map[action];
+      return action.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    }
+
+    function formatPercentage(value) {
+      if (value === undefined || value === null || isNaN(value)) return '0%';
+      const pct = value <= 1 ? value * 100 : value;
+      return `${pct.toFixed(pct % 1 === 0 ? 0 : 2)}%`;
+    }
+
+    function formatINR(amount) {
+      if (amount === undefined || amount === null || isNaN(amount)) return '₹0.00';
+      return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    function formatRuleName(rule) {
+      if (!rule) return '';
+      return rule.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    }
+
+    // Main Standalone App Component
+    function StandaloneApp() {
+      const [ticketId, setTicketId] = useState('N-015');
+      const [inputTicket, setInputTicket] = useState('N-015');
+      const [data, setData] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState(null);
+      const [isOnline, setIsOnline] = useState(null);
+
+      const checkHealth = async () => {
+        setIsOnline(null);
+        try {
+          const res = await fetch(`${API_BASE_URL}/health`);
+          if (res.ok) setIsOnline(true);
+          else setIsOnline(false);
+        } catch {
+          setIsOnline(false);
+        }
+      };
+
+      useEffect(() => {
+        checkHealth();
+      }, []);
+
+      const handleResolve = async (idToResolve) => {
+        const cleanId = (idToResolve || inputTicket).trim();
+        if (!cleanId) return;
+
+        setTicketId(cleanId);
+        setInputTicket(cleanId);
+        setLoading(true);
+        setError(null);
+
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/tickets/resolve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticket_id: cleanId })
+          });
+
+          if (!res.ok) {
+            let msg = `Server Error (${res.status})`;
+            try {
+              const errJson = await res.json();
+              if (errJson.detail) msg = typeof errJson.detail === 'string' ? errJson.detail : JSON.stringify(errJson.detail);
+            } catch {}
+            throw new Error(msg);
+          }
+
+          const resultData = await res.json();
+          setData(resultData);
+        } catch (err) {
+          setError(err.message || 'Failed to resolve ticket.');
+          setData(null);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div className="pb-16">
+          {/* Header */}
+          <header className="border-b border-gray-800/80 bg-gray-950/70 backdrop-blur-md sticky top-0 z-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center space-x-3">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-600 via-indigo-600 to-violet-800 flex items-center justify-center shadow-lg shadow-purple-900/30 ring-1 ring-white/20">
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-gray-100 to-gray-400 bg-clip-text text-transparent">
+                      Zepto Resolution Engine
+                    </h1>
+                    <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-purple-950/80 text-purple-300 border border-purple-800/50">
+                      AI Ops
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 font-medium">Evidence-based customer support automation</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between sm:justify-end space-x-4 text-xs">
+                <nav className="flex items-center space-x-2 text-gray-300 font-medium">
+                  <span className="px-2.5 py-1.5 rounded-lg bg-gray-900 text-purple-300 border border-purple-900/50 flex items-center gap-1.5">
+                    Dashboard
+                  </span>
+                  <a href={`${API_BASE_URL}/docs`} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition flex items-center gap-1">
+                    Docs ↗
+                  </a>
+                </nav>
+
+                <button onClick={checkHealth} className="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-gray-900 border border-gray-800 hover:border-gray-700 transition cursor-pointer">
+                  <span className={`h-2.5 w-2.5 rounded-full ${isOnline === true ? 'bg-emerald-500 animate-pulse' : isOnline === false ? 'bg-rose-500' : 'bg-amber-500'}`}></span>
+                  <span className="font-semibold text-xs">
+                    {isOnline === true ? <span className="text-emerald-400">Backend Online</span> : isOnline === false ? <span className="text-rose-400">Backend Offline</span> : <span className="text-amber-400">Checking...</span>}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
+            
+            {/* Input Hero */}
+            <div className="bg-gradient-to-b from-gray-900/90 to-gray-950/90 border border-gray-800/80 rounded-2xl p-6 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    Resolve Customer Ticket
+                  </h2>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Analyze historical precedents, evaluate policy safety, and determine the safest resolution.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-gray-400 text-[11px] font-medium uppercase tracking-wider">Demo Presets:</span>
+                  {SAMPLE_TICKETS.map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleResolve(item.id)}
+                      disabled={loading}
+                      className={`px-2.5 py-1 rounded-lg font-mono text-xs font-semibold border transition flex items-center gap-1.5 ${
+                        inputTicket === item.id ? 'bg-purple-950 border-purple-500 text-purple-200' : 'bg-gray-900 border-gray-800 text-gray-300 hover:border-gray-700'
+                      }`}
+                    >
+                      <span>{item.id}</span>
+                      {item.tag && (
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded ${item.tag === 'AUTO_RESOLVE' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/60' : 'bg-amber-950 text-amber-300 border border-amber-800/60'}`}>
+                          {item.tag === 'AUTO_RESOLVE' ? 'Auto' : 'Review'}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <form onSubmit={(e) => { e.preventDefault(); handleResolve(); }} className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="text"
+                  value={inputTicket}
+                  onChange={(e) => setInputTicket(e.target.value)}
+                  placeholder="Enter Ticket ID (e.g. N-015)"
+                  disabled={loading}
+                  className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-xl text-white placeholder-gray-500 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                />
+                <button
+                  type="submit"
+                  disabled={loading || !inputTicket.trim()}
+                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-purple-950/50 transition disabled:opacity-50 min-w-[140px] flex items-center justify-center gap-2"
+                >
+                  {loading ? 'Analyzing...' : 'Resolve Ticket'}
+                </button>
+              </form>
+            </div>
+
+            {/* Loading */}
+            {loading && (
+              <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-8 text-center backdrop-blur-xl shadow-xl my-8">
+                <div className="animate-spin h-8 w-8 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-3"></div>
+                <h3 className="text-base font-bold text-white">Analyzing historical evidence & evaluating policies...</h3>
+              </div>
+            )}
+
+            {/* Error */}
+            {!loading && error && (
+              <div className="bg-rose-950/80 border border-rose-500/50 rounded-2xl p-6 text-rose-100 flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-bold text-white">Unable to resolve ticket</h3>
+                  <p className="text-xs text-rose-200 mt-1">{error}</p>
+                </div>
+                <button onClick={() => handleResolve()} className="px-4 py-2 bg-rose-900 hover:bg-rose-800 text-xs font-semibold rounded-xl border border-rose-600">
+                  Try Again
+                </button>
+              </div>
+            )}
+
+            {/* Results */}
+            {!loading && !error && data && (
+              <div className="space-y-8 animate-fadeIn">
+                
+                {/* Decision Card */}
+                <div className={`rounded-2xl border p-7 backdrop-blur-xl shadow-2xl ${
+                  data.decision === 'AUTO_RESOLVE' ? 'bg-gradient-to-br from-emerald-950/70 via-gray-900 to-gray-950 border-emerald-500/40' : 'bg-gradient-to-br from-amber-950/70 via-gray-900 to-gray-950 border-amber-500/40'
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-gray-800">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-md bg-gray-950 border border-gray-800 text-purple-300">
+                          Ticket #{data.ticket_id}
+                        </span>
+                        <span className="text-xs text-gray-400">Incoming Complaint</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white mt-1.5 italic">"{data.description}"</h3>
+                    </div>
+
+                    <div className={`px-4 py-2 rounded-xl border flex items-center gap-2 ${
+                      data.decision === 'AUTO_RESOLVE' ? 'bg-emerald-950 border-emerald-500/50 text-emerald-300' : 'bg-amber-950 border-amber-500/50 text-amber-300'
+                    }`}>
+                      <span className="text-xs font-bold uppercase">Decision:</span>
+                      <span className="text-sm font-black text-white">{data.decision}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+                    <div className="bg-gray-950/60 border border-gray-800 rounded-xl p-4">
+                      <span className="text-xs font-semibold uppercase text-gray-400 block mb-1">Suggested Action</span>
+                      <div className="text-lg font-bold text-white">{formatActionName(data.suggested_action)}</div>
+                    </div>
+
+                    <div className={`border rounded-xl p-4 ${data.decision === 'AUTO_RESOLVE' ? 'bg-emerald-950/40 border-emerald-800/50' : 'bg-amber-950/30 border-amber-800/40'}`}>
+                      <span className="text-xs font-semibold uppercase text-gray-400 block mb-1">Executed Action</span>
+                      <div className={`text-lg font-bold ${data.executed_action ? 'text-emerald-300' : 'text-amber-300 text-sm'}`}>
+                        {formatActionName(data.executed_action)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Confidence Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[
+                    { label: 'Retrieval Confidence', val: data.retrieval_confidence },
+                    { label: 'Resolution Confidence', val: data.resolution_confidence },
+                    { label: 'Top-3 Agreement', val: data.top3_agreement },
+                  ].map((m, idx) => (
+                    <div key={idx} className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 backdrop-blur-xl">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">{m.label}</span>
+                      <div className="text-3xl font-extrabold font-mono text-white mt-2">{formatPercentage(m.val)}</div>
+                      <div className="w-full bg-gray-950 rounded-full h-1.5 mt-3 overflow-hidden border border-gray-800">
+                        <div className="bg-gradient-to-r from-purple-500 to-indigo-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, (m.val <= 1 ? m.val * 100 : m.val))}%` }}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Reason */}
+                <div className="bg-gray-900/90 border border-purple-900/40 rounded-2xl p-6">
+                  <h3 className="text-xs font-bold uppercase text-purple-300">Why this decision?</h3>
+                  <p className="text-base text-gray-100 font-medium italic border-l-2 border-purple-500/50 pl-3 mt-2">"{data.reason}"</p>
+                </div>
+
+                {/* Evidence & Action Distribution */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2 bg-gray-900/80 border border-gray-800 rounded-2xl p-6">
+                    <h3 className="text-lg font-bold text-white mb-4">Historical Evidence</h3>
+                    <div className="space-y-3">
+                      {(data.precedents || []).map((p, idx) => (
+                        <div key={idx} className="bg-gray-950/80 border border-gray-800 rounded-xl p-4 flex flex-col sm:flex-row justify-between gap-3">
+                          <div>
+                            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-gray-900 text-purple-300 border border-purple-900">#{p.ticket_id}</span>
+                            <p className="text-sm font-semibold text-white mt-1">"{p.description}"</p>
+                            <p className="text-xs text-gray-400 italic mt-0.5">{p.resolution_note}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-xs font-mono font-bold text-purple-300 block">{formatPercentage(p.similarity)} similarity</span>
+                            <span className="text-xs font-bold text-emerald-400">{formatActionName(p.action)}</span>
+                            <span className="text-xs text-amber-300 block">CSAT {p.csat}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-6">
+                    <h3 className="text-base font-bold text-white mb-4">Action Distribution</h3>
+                    <div className="space-y-3">
+                      {Object.entries(data.action_distribution || {}).map(([act, wt], idx) => (
+                        <div key={idx}>
+                          <div className="flex justify-between text-xs font-semibold">
+                            <span className="text-gray-200">{formatActionName(act)}</span>
+                            <span className="font-mono text-indigo-300">{formatPercentage(wt)}</span>
+                          </div>
+                          <div className="w-full bg-gray-950 rounded-full h-2 mt-1">
+                            <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${Math.min(100, (wt <= 1 ? wt * 100 : wt))}%` }}></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Order Context & Policy Safety */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-6">
+                    <h3 className="text-base font-bold text-white mb-4">Order Context</h3>
+                    {data.order ? (
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="bg-gray-950 p-3 rounded-xl"><span className="text-gray-400 block">Order ID</span><span className="text-sm font-bold text-white">#{data.order.order_id}</span></div>
+                        <div className="bg-gray-950 p-3 rounded-xl"><span className="text-gray-400 block">Items</span><span className="text-sm font-bold text-white">{data.order.items} items</span></div>
+                        <div className="bg-gray-950 p-3 rounded-xl"><span className="text-gray-400 block">Order Value</span><span className="text-sm font-bold text-emerald-400 font-mono">{formatINR(data.order.value_inr)}</span></div>
+                        <div className="bg-gray-950 p-3 rounded-xl"><span className="text-gray-400 block">Delivery Time</span><span className="text-sm font-bold text-white">{data.order.delivery_time_min} mins</span></div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400">No order context available.</p>
+                    )}
+                  </div>
+
+                  <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-6">
+                    <h3 className="text-base font-bold text-white mb-4">Policy Safety Checks</h3>
+                    <div className="space-y-3">
+                      {(data.policy_checks || []).map((chk, idx) => (
+                        <div key={idx} className="bg-gray-950 p-4 rounded-xl flex items-start justify-between gap-3">
+                          <div>
+                            <h4 className="text-sm font-bold text-white">{formatRuleName(chk.rule)}</h4>
+                            <p className="text-xs text-gray-300 mt-0.5">"{chk.reason}"</p>
+                          </div>
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${chk.passed ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-800'}`}>
+                            {chk.passed ? 'PASSED' : 'FAILED'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* Empty State */}
+            {!loading && !error && !data && (
+              <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-12 text-center my-8">
+                <h3 className="text-lg font-bold text-white">Enter a ticket ID to begin resolution analysis</h3>
+                <p className="text-xs text-gray-400 mt-1 max-w-md mx-auto">
+                  The resolution engine evaluates historical precedents, decision model confidence, and policy safety before recommending or executing an action.
+                </p>
+                <div className="pt-4 flex justify-center gap-3">
+                  <button onClick={() => handleResolve('N-015')} className="px-4 py-2 rounded-xl bg-emerald-950 border border-emerald-500/40 text-emerald-300 text-xs font-semibold cursor-pointer">
+                    Test N-015 (Auto Resolve)
+                  </button>
+                  <button onClick={() => handleResolve('N-002')} className="px-4 py-2 rounded-xl bg-amber-950 border border-amber-500/40 text-amber-300 text-xs font-semibold cursor-pointer">
+                    Test N-002 (Human Review)
+                  </button>
+                </div>
+              </div>
+            )}
+
+          </main>
+        </div>
+      );
+    }
+
+    // Mount Standalone React App if root is empty
+    setTimeout(() => {
+      const rootEl = document.getElementById('root');
+      if (rootEl && !rootEl.hasChildNodes()) {
+        ReactDOM.createRoot(rootEl).render(<StandaloneApp />);
+      }
+    }, 100);
+  </script>
+</body>
+</html>
