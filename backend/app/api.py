@@ -40,6 +40,29 @@ def health():
     }
 
 
+@app.get("/api/tickets")
+def get_tickets():
+    try:
+        tickets = engine.new_tickets[
+            ["ticket_id", "description", "order_id"]
+        ].to_dict(orient="records")
+
+        return {
+            "total": len(tickets),
+            "tickets": tickets
+        }
+
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc()
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+
 @app.post("/api/tickets/resolve")
 def resolve_ticket(request: ResolveRequest):
     try:
